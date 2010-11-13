@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2009 ARATA Mizuki
+** Copyright (C) 2009-2010 ARATA Mizuki
 ** See file COPYRIGHT for more information
 */
 
@@ -67,6 +67,20 @@ DataType(ExifContent *, content)
 DataType(ExifEntry *, entry)
 DataType(ExifMnoteData *, mnote_data)
 #undef DataType
+
+static const char tname_rational[] = "exif:rational";
+static void pushrational (lua_State *L, lua_Number numerator, lua_Number denominator) {
+  lua_createtable(L, 0, 2);
+  lua_pushnumber(L, numerator);
+  lua_setfield(L, -2, "numerator");
+  lua_pushnumber(L, denominator);
+  lua_setfield(L, -2, "denominator");
+  lua_pushnumber(L, numerator/denominator);
+  lua_setfield(L, -2, "value");
+  luaL_getmetatable(L, tname_rational);
+  lua_setmetatable(L, -2);
+}
+
 
 static int Lnew (lua_State *L) { /** new() */
   pushdata(L, exif_data_new());
@@ -229,6 +243,65 @@ static int Egetparent (lua_State *L) { /** entry.parent */
   return 1;
 }
 
+static void entry_getdata_aux (lua_State *L, ExifEntry *entry, unsigned int n) {
+  ExifFormat format = entry->format;
+  size_t formatsize = (size_t)exif_format_get_size(format);
+  const unsigned char *ptr = entry->data+formatsize*n;
+  ExifByteOrder order = exif_data_get_byte_order(entry->parent->parent);
+
+  switch (format) {
+  case EXIF_FORMAT_BYTE: lua_pushinteger(L, (ExifByte)*ptr); break;
+  case EXIF_FORMAT_SBYTE: lua_pushinteger(L, (ExifSByte)*ptr); break;
+  case EXIF_FORMAT_SHORT: lua_pushinteger(L, exif_get_short(ptr, order)); break;
+  case EXIF_FORMAT_SSHORT: lua_pushinteger(L, exif_get_sshort(ptr, order)); break;
+  case EXIF_FORMAT_LONG: lua_pushnumber(L, exif_get_long(ptr, order)); break;
+  case EXIF_FORMAT_SLONG: lua_pushinteger(L, exif_get_slong(ptr, order)); break;
+  case EXIF_FORMAT_RATIONAL: {
+      ExifRational rat = exif_get_rational(ptr, order);
+      pushrational(L, rat.numerator, rat.denominator);
+      break;
+    }
+  case EXIF_FORMAT_SRATIONAL: {
+      ExifSRational rat = exif_get_srational(ptr, order);
+      pushrational(L, rat.numerator, rat.denominator);
+      break;
+    }
+  case EXIF_FORMAT_ASCII: lua_pushinteger(L, *ptr); break;
+  default:
+    lua_pushnil(L);
+    break;
+  }
+}
+
+static int Egetdata (lua_State *L) { /** entry.data */
+  entry_getdata_aux(L, checkentry(L), 0);
+  return 1;
+}
+
+static int E_index (lua_State *L) { /** entry[n] */
+  if (lua_isnumber(L, 2)) {
+    ExifEntry *entry = checkentry(L);
+    lua_Number n = lua_tonumber(L, 2);
+    if (n < 1 || entry->components < n) {
+      lua_pushnil(L);
+    } else {
+      entry_getdata_aux(L, entry, (unsigned int)(n-1));
+    }
+    return 1;
+  } else {
+    lua_pushvalue(L, 2);
+    lua_gettable(L, lua_upvalueindex(2)); /* getter[key] */
+    if (lua_isfunction(L, -1)) {
+      lua_pushvalue(L, 1);
+      lua_call(L, 1, 1);
+      return 1;
+    }
+    lua_pushvalue(L, 2);
+    lua_gettable(L, lua_upvalueindex(1)); /* metatable[key] */
+    return 1;
+  }
+}
+
 static int M_len (lua_State *L) { /** #mnotedata */
   ExifMnoteData *md = checkmnote_data(L);
   lua_pushnumber(L, exif_mnote_data_count(md));
@@ -267,6 +340,15 @@ static int M_index (lua_State *L) { /** mnotedata[n] */
   }
 }
 
+static int Rtostring (lua_State *L) { /** tostring(r) */
+  luaL_checktype(L, 1, LUA_TTABLE);
+  lua_getfield(L, 1, "numerator");
+  lua_pushliteral(L, "/");
+  lua_getfield(L, 1, "denominator");
+  lua_concat(L, 3);
+  return 1;
+}
+
 
 static const luaL_Reg funcs[] = {
   {"new", Lnew},
@@ -303,9 +385,15 @@ static const luaL_Reg contentpropget[] = {
   {NULL, NULL}
 };
 
-static const luaL_Reg entryfuncs[] = {
+static const luaL_Reg entrymm[] = {
   {"__gc", entry_gc},
   {"__tostring", Egetvalue},
+  {"__len", Egetcomponents},
+  /* {"__index", E_index}, -- registered in luaopen_exif */
+  {NULL, NULL}
+};
+
+static const luaL_Reg entryfuncs[] = {
   {"fix", Efix},
   {NULL, NULL}
 };
@@ -317,6 +405,7 @@ static const luaL_Reg entrypropget[] = {
   {"format", Egetformat},
   {"rawdata", Egetrawdata},
   {"parent", Egetparent},
+  {"data", Egetdata},
   {NULL, NULL}
 };
 
@@ -326,6 +415,12 @@ static const luaL_Reg mnotedatafuncs[] = {
   {"__index", M_index},
   {NULL, NULL}
 };
+
+static const luaL_Reg rationalmm[] = {
+  {"__tostring", Rtostring},
+  {NULL, NULL}
+};
+
 
 static int prop_index (lua_State *L) {
   lua_pushvalue(L, 2);
@@ -365,11 +460,19 @@ LUALIB_API int luaopen_exif (lua_State *L) {
   luaL_register(L, NULL, contentfuncs);
 
   luaL_newmetatable(L, tname_entry);
-  setupprop(L, entrypropget);
+  luaL_register(L, NULL, entrymm);
+  lua_newtable(L);
   luaL_register(L, NULL, entryfuncs);
+  lua_newtable(L);
+  luaL_register(L, NULL, entrypropget);
+  lua_pushcclosure(L, E_index, 2);
+  lua_setfield(L, -2, "__index");
 
   luaL_newmetatable(L, tname_mnote_data);
   luaL_register(L, NULL, mnotedatafuncs);
+
+  luaL_newmetatable(L, tname_rational);
+  luaL_register(L, NULL, rationalmm);
 
   luaL_register(L, "exif", funcs);
   return 1;
