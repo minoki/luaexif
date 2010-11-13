@@ -116,7 +116,7 @@ static int Dloadbuffer (lua_State *L) { /** data:loadbuffer(buf) */
   return 0;
 }
 
-static int Dcontent (lua_State *L) { /** data:content(ifd) */
+static int Difd (lua_State *L) { /** data:ifd(ifd) */
   ExifData *data = checkdata(L);
   static const char *const ifdnames[] = {
     "0",
@@ -145,7 +145,7 @@ static void contentfunc (ExifContent *content, void *userdata) {
   lua_rawseti(L, -2, n+1);
 }
 
-static int Dcontents (lua_State *L) { /** data:contents() */
+static int Difds (lua_State *L) { /** data:ifds() */
   ExifData *data = checkdata(L);
   lua_newtable(L);
   exif_data_foreach_content(data, contentfunc, (void *)L);
@@ -366,8 +366,8 @@ static const luaL_Reg datafuncs[] = {
   {"__gc", data_gc},
   {"fix", Dfix},
   {"loadbuffer", Dloadbuffer},
-  {"content", Dcontent},
-  {"contents", Dcontents},
+  {"ifd", Difd},
+  {"ifds", Difds},
   {NULL, NULL}
 };
 

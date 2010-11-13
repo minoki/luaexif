@@ -1,8 +1,8 @@
 require "exif"
 local file = assert(arg[1],"no file given")
 local data = exif.loadfile(file)
-for _,content in ipairs(data:contents()) do
-  assert(content == data:content(content.ifd))
+for _,content in ipairs(data:ifds()) do
+  assert(content == data:ifd(content.ifd))
   assert(content.parent == data)
   io.write("IFD ",content.ifd,":\n")
   for _,entry in ipairs(content:entries()) do
