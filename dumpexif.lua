@@ -17,14 +17,16 @@ for _,content in ipairs(data:ifds()) do
 end
 do
   local mnotedata = data.mnotedata
-  io.write("MakerNotes:\n")
-  for i = 1,#mnotedata do
-    local x = mnotedata[i]
-    io.write(string.format("\t[#%d %s] %s (%s)\t%s\n",
-      x.tagid,
-      x.tag or "<unknown>",
-      x.title or "<unknown>",
-      x.description or "<unknown>",
-      x.value))
+  if mnotedata then
+    io.write("MakerNotes:\n")
+    for i = 1,#mnotedata do
+      local x = mnotedata[i]
+      io.write(string.format("\t[#%d %s] %s (%s)\t%s\n",
+        x.tagid,
+        x.tag or "<unknown>",
+        x.title or "<unknown>",
+        x.description or "<unknown>",
+        x.value))
+    end
   end
 end
