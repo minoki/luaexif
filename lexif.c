@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2009-2010 ARATA Mizuki
+** Copyright (C) 2009-2010,2014 ARATA Mizuki
 ** See file COPYRIGHT for more information
 */
 
