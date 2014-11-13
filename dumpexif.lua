@@ -1,4 +1,4 @@
-require "exif"
+local exif = require "exif"
 local file = assert(arg[1],"no file given")
 local data = exif.loadfile(file)
 for _,content in ipairs(data:ifds()) do

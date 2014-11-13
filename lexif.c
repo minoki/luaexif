@@ -21,12 +21,28 @@
 #define inline
 #endif
 
+#if LUA_VERSION_NUM == 501
+static inline size_t lua_rawlen(lua_State *L, int idx) {
+  return lua_objlen(L, idx);
+}
+static inline void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
+  luaI_openlib(L, NULL, l, nup);
+}
+#define luaL_newlibtable(L,l) \
+  lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
+#endif
+
+/*
+  Most of the library functions has the 'pointer -> object' table
+  (the table with lightuserdata keys and the corresponding userdata values)
+  at the upvalueindex 1.
+ */
 static void push_unique (lua_State *L, void *ptr, const char *tname, void (*ref)(void *)) {
   if (!ptr) {
     lua_pushnil(L);
   } else {
     lua_pushlightuserdata(L, ptr);
-    lua_rawget(L, LUA_ENVIRONINDEX);
+    lua_rawget(L, lua_upvalueindex(1));
     if (lua_isnil(L, -1)) {
       void **p;
       lua_pop(L, 1);
@@ -38,7 +54,7 @@ static void push_unique (lua_State *L, void *ptr, const char *tname, void (*ref)
       ref(ptr);
       lua_pushlightuserdata(L, ptr);
       lua_pushvalue(L, -2);
-      lua_rawset(L, LUA_ENVIRONINDEX);
+      lua_rawset(L, lua_upvalueindex(1));
     }
   }
 }
@@ -140,7 +156,7 @@ static int Difd (lua_State *L) { /** data:ifd(ifd) */
 
 static void contentfunc (ExifContent *content, void *userdata) {
   lua_State *L = (lua_State *)userdata;
-  int n = lua_objlen(L, -1);
+  int n = lua_rawlen(L, -1);
   pushcontent(L, content);
   lua_rawseti(L, -2, n+1);
 }
@@ -180,7 +196,7 @@ static int Cgetifd (lua_State *L) { /** content.ifd */
 
 static void entryfunc (ExifEntry *entry, void *userdata) {
   lua_State *L = (lua_State *)userdata;
-  int n = lua_objlen(L, -1);
+  int n = lua_rawlen(L, -1);
   pushentry(L, entry);
   lua_rawseti(L, -2, n+1);
 }
@@ -436,44 +452,57 @@ static int prop_index (lua_State *L) {
 }
 
 static void setupprop (lua_State *L, const luaL_Reg *get) {
-  lua_pushvalue(L, -1); /* metatable */
-  lua_newtable(L);
-  luaL_register(L, NULL, get);
-  lua_pushcclosure(L, prop_index, 2);
+  lua_pushvalue(L, -1);     /* metatable */
+  lua_newtable(L);          /* getters table */
+  lua_pushvalue(L, -4);     /* pointer -> object table */
+  luaL_setfuncs(L, get, 1); /* set getters table */
+  lua_pushcclosure(L, prop_index, 2); /* upvalues: metatable, getters */
   lua_setfield(L, -2, "__index");
 }
 
 LUALIB_API int luaopen_exif (lua_State *L) {
-  lua_newtable(L);
+  lua_newtable(L); /* pointer -> object table */
   lua_createtable(L, 0, 1);
   lua_pushliteral(L, "v");
   lua_setfield(L, -2, "__mode");
   lua_setmetatable(L, -2);
-  lua_replace(L, LUA_ENVIRONINDEX);
 
   luaL_newmetatable(L, tname_data);
-  setupprop(L, datapropget);
-  luaL_register(L, NULL, datafuncs);
+  setupprop(L, datapropget); /* set __index */
+  lua_pushvalue(L, -2); /* pointer -> object table */
+  luaL_setfuncs(L, datafuncs, 1);
+  lua_pop(L, 1);
 
   luaL_newmetatable(L, tname_content);
-  setupprop(L, contentpropget);
-  luaL_register(L, NULL, contentfuncs);
+  setupprop(L, contentpropget); /* set __index */
+  lua_pushvalue(L, -2); /* pointer -> object table */
+  luaL_setfuncs(L, contentfuncs, 1);
+  lua_pop(L, 1);
 
   luaL_newmetatable(L, tname_entry);
-  luaL_register(L, NULL, entrymm);
-  lua_newtable(L);
-  luaL_register(L, NULL, entryfuncs);
-  lua_newtable(L);
-  luaL_register(L, NULL, entrypropget);
+  lua_pushvalue(L, -2); /* pointer -> object table */
+  luaL_setfuncs(L, entrymm, 1);
+  lua_newtable(L);      /* table of functions */
+  lua_pushvalue(L, -3); /* pointer -> object table */
+  luaL_setfuncs(L, entryfuncs, 1);
+  lua_newtable(L);      /* table of property getters */
+  lua_pushvalue(L, -4); /* pointer -> object table */
+  luaL_setfuncs(L, entrypropget, 1);
   lua_pushcclosure(L, E_index, 2);
   lua_setfield(L, -2, "__index");
+  lua_pop(L, 1);
 
   luaL_newmetatable(L, tname_mnote_data);
-  luaL_register(L, NULL, mnotedatafuncs);
+  lua_pushvalue(L, -2); /* pointer -> object table */
+  luaL_setfuncs(L, mnotedatafuncs, 1);
+  lua_pop(L, 1);
 
   luaL_newmetatable(L, tname_rational);
-  luaL_register(L, NULL, rationalmm);
+  luaL_setfuncs(L, rationalmm, 0);
+  lua_pop(L, 1);
 
-  luaL_register(L, "exif", funcs);
+  luaL_newlibtable(L, funcs);
+  lua_pushvalue(L, -2); /* pointer -> object table */
+  luaL_setfuncs(L, funcs, 1);
   return 1;
 }
