@@ -3,12 +3,14 @@ LUAINC= $(LUA)/include
 LUALIB= $(LUA)/lib
 LUABIN= $(LUA)/bin
 
-LIBEXIF= /opt/local
+LIBEXIF= /usr/local
 LIBEXIFINC= $(LIBEXIF)/include
 LIBEXIFLIB= $(LIBEXIF)/lib
 
 CC= gcc
 CFLAGS= -ansi $(INCS) $(WARN) -O2 $G
+# On Linux, set LDFLAGS=-shared
+LDFLAGS= -bundle -undefined dynamic_lookup
 WARN= -pedantic -Wall
 INCS= -I$(LUAINC) -I$(LIBEXIFINC)
 LIBS= -L$(LIBEXIFLIB) -lexif
@@ -19,7 +21,7 @@ OBJS= lexif.o
 all: $T
 
 $T: $(OBJS)
-	$(CC) -o $@ -bundle -undefined dynamic_lookup $(OBJS) $(LIBS)
+	$(CC) -o $@ $(LDFLAGS) $(OBJS) $(LIBS)
 
 clean:
 	rm -f $(OBJS) $T
