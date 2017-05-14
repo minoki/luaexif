@@ -30,6 +30,9 @@ static inline void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
 }
 #define luaL_newlibtable(L,l) \
   lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
+static inline int lua_isinteger(lua_State *L, int idx) {
+  return lua_isnumber(L, idx);
+}
 #endif
 
 /*
@@ -85,13 +88,17 @@ DataType(ExifMnoteData *, mnote_data)
 #undef DataType
 
 static const char tname_rational[] = "exif:rational";
-static void pushrational (lua_State *L, lua_Number numerator, lua_Number denominator) {
+static void pushrational (lua_State *L, lua_Integer numerator, lua_Integer denominator) {
   lua_createtable(L, 0, 2);
-  lua_pushnumber(L, numerator);
+  lua_pushinteger(L, numerator);
   lua_setfield(L, -2, "numerator");
-  lua_pushnumber(L, denominator);
+  lua_pushinteger(L, denominator);
   lua_setfield(L, -2, "denominator");
-  lua_pushnumber(L, numerator/denominator);
+  if (denominator == 1) {
+    lua_pushinteger(L, numerator);
+  } else {
+    lua_pushnumber(L, (lua_Number)numerator/(lua_Number)denominator);
+  }
   lua_setfield(L, -2, "value");
   luaL_getmetatable(L, tname_rational);
   lua_setmetatable(L, -2);
@@ -126,9 +133,7 @@ static int Dloadbuffer (lua_State *L) { /** data:loadbuffer(buf) */
   ExifData *data = checkdata(L);
   size_t length;
   const char *buffer = luaL_checklstring(L, 2, &length);
-
   exif_data_load_data(data, (const unsigned char *)buffer, length);
-
   return 0;
 }
 
@@ -237,7 +242,7 @@ static int Egetvalue (lua_State *L) { /** entry.value */
 
 static int Egetcomponents (lua_State *L) { /** entry.components */
   ExifEntry *entry = checkentry(L);
-  lua_pushnumber(L, entry->components);
+  lua_pushinteger(L, entry->components);
   return 1;
 }
 
@@ -270,7 +275,7 @@ static void entry_getdata_aux (lua_State *L, ExifEntry *entry, unsigned int n) {
   case EXIF_FORMAT_SBYTE: lua_pushinteger(L, (ExifSByte)*ptr); break;
   case EXIF_FORMAT_SHORT: lua_pushinteger(L, exif_get_short(ptr, order)); break;
   case EXIF_FORMAT_SSHORT: lua_pushinteger(L, exif_get_sshort(ptr, order)); break;
-  case EXIF_FORMAT_LONG: lua_pushnumber(L, exif_get_long(ptr, order)); break;
+  case EXIF_FORMAT_LONG: lua_pushinteger(L, exif_get_long(ptr, order)); break;
   case EXIF_FORMAT_SLONG: lua_pushinteger(L, exif_get_slong(ptr, order)); break;
   case EXIF_FORMAT_RATIONAL: {
       ExifRational rat = exif_get_rational(ptr, order);
@@ -295,9 +300,9 @@ static int Egetdata (lua_State *L) { /** entry.data */
 }
 
 static int E_index (lua_State *L) { /** entry[n] */
-  if (lua_isnumber(L, 2)) {
+  if (lua_isinteger(L, 2)) {
     ExifEntry *entry = checkentry(L);
-    lua_Number n = lua_tonumber(L, 2);
+    lua_Integer n = lua_tointeger(L, 2);
     if (n < 1 || entry->components < n) {
       lua_pushnil(L);
     } else {
@@ -320,20 +325,20 @@ static int E_index (lua_State *L) { /** entry[n] */
 
 static int M_len (lua_State *L) { /** #mnotedata */
   ExifMnoteData *md = checkmnote_data(L);
-  lua_pushnumber(L, exif_mnote_data_count(md));
+  lua_pushinteger(L, exif_mnote_data_count(md));
   return 1;
 }
 
 static int M_index (lua_State *L) { /** mnotedata[n] */
-  if (lua_isnumber(L, 2)) {
+  if (lua_isinteger(L, 2)) {
     ExifMnoteData *md = checkmnote_data(L);
-    lua_Number n = lua_tonumber(L, 2);
+    lua_Integer n = lua_tointeger(L, 2);
     if (n < 1 || exif_mnote_data_count(md) < n) {
       lua_pushnil(L);
     } else {
       unsigned int n_ = (unsigned int)(n-1);
       lua_createtable(L, 0, 5);
-      lua_pushnumber(L, exif_mnote_data_get_id(md, n_));
+      lua_pushinteger(L, exif_mnote_data_get_id(md, n_));
       lua_setfield(L, -2, "tagid");
       lua_pushstring(L, exif_mnote_data_get_name(md, n_));
       lua_setfield(L, -2, "tag");
