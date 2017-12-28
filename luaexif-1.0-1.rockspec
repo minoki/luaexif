@@ -1,7 +1,8 @@
 package = "luaexif"
-version = "scm-1"
+version = "1.0-1"
 source = {
-   url = "https://github.com/minoki/luaexif"
+   url = "git://github.com/minoki/luaexif",
+   tag = "v1.0"
 }
 description = {
    summary = "Lua binding for libexif",
