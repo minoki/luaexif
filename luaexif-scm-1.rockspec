@@ -6,7 +6,7 @@ source = {
 description = {
    summary = "Lua binding for libexif",
    detailed = [[
-This is a Lua binding for libexif (http://libexif.sourceforge.net/).]],
+This is a Lua binding for libexif (http://libexif.github.io/).]],
    homepage = "https://github.com/minoki/luaexif",
    license = "MIT"
 }

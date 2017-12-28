@@ -1,7 +1,7 @@
 luaexif
 =======
 
-This is a [Lua](https://www.lua.org/) binding for [libexif](http://libexif.sourceforge.net/).
+This is a [Lua](https://www.lua.org/) binding for [libexif](https://libexif.github.io/).
 Compatible with Lua 5.1 or later.
 
 Install
@@ -92,4 +92,4 @@ Links
 =====
 
 * [Lua](https://www.lua.org/)
-* [libexif](http://libexif.sourceforge.net/)
+* [libexif](https://libexif.github.io/)
