@@ -8,7 +8,7 @@ LIBEXIFINC= $(LIBEXIF)/include
 LIBEXIFLIB= $(LIBEXIF)/lib
 
 CC= gcc
-CFLAGS= -ansi $(INCS) $(WARN) -O2 $G
+CFLAGS= -std=c99 $(INCS) $(WARN) -O2 $G
 # On Linux, set LDFLAGS=-shared
 LDFLAGS= -bundle -undefined dynamic_lookup
 WARN= -pedantic -Wall
