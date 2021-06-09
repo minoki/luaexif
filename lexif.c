@@ -25,14 +25,22 @@
 static inline size_t lua_rawlen(lua_State *L, int idx) {
   return lua_objlen(L, idx);
 }
-static inline void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
-  luaI_openlib(L, NULL, l, nup);
-}
-#define luaL_newlibtable(L,l) \
-  lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
 static inline int lua_isinteger(lua_State *L, int idx) {
   return lua_isnumber(L, idx);
 }
+static void compat_luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
+  for (; l->name; ++l) {
+    for (int i = 0; i < nup; ++i) {
+      lua_pushvalue(L, -nup);
+    }
+    lua_pushcclosure(L, l->func, nup);
+    lua_setfield(L, -(nup+2), l->name);
+  }
+  lua_pop(L, nup);
+}
+#define luaL_setfuncs compat_luaL_setfuncs
+#define luaL_newlibtable(L,l) \
+  lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
 #endif
 
 /*
